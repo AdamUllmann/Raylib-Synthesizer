@@ -144,22 +144,19 @@ float noise(float frequency, float& phase) {
 }
 
 void controls(float &frequency, bool &keyDown) {
-
-    // First, apply tuning adjustments:
-    if (IsKeyPressed(KEY_UP)) {
-        tuningFactor *= 2;  // Double the frequency
+    if (IsKeyPressed(KEY_UP)) {     // tuning
+        tuningFactor *= 2;  
     }
     if (IsKeyPressed(KEY_DOWN)) {
-        tuningFactor *= 0.5;  // Halve the frequency
+        tuningFactor *= 0.5;
     }
     if (IsKeyDown(KEY_RIGHT)) {
-        tuningFactor *= 1.01;  // Small increase for fine-tuning
+        tuningFactor *= 1.01;
     }
     if (IsKeyDown(KEY_LEFT)) {
-        tuningFactor *= 0.99;  // Small decrease for fine-tuning
+        tuningFactor *= 0.99;
     }
 
-    // Next, check for note keys and apply the tuning factor:
     for (const auto& pair : keyToNote) {
         if (IsKeyDown(pair.first)) {
             frequency = noteFrequencies[pair.second] * tuningFactor;
