@@ -1,17 +1,20 @@
-// Synth.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// Synth.cpp
+// By Adam Ullmann
 
 #include "raylib.h"
 #include <cmath>
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <set>
 
 const int sampleRate = 44100;
 const float twoPi = 2 * PI;
 const int defaultBufferSize = 1024;
 
 float tuningFactor = 1.0f;
+std::set<float> activeFrequencies;
+std::unordered_map<float, float> phases;
 
 std::unordered_map<std::string, float> noteFrequencies = {
     // octave 3
@@ -87,7 +90,7 @@ float sineWave(float frequency, float& phase) {
 }
 
 float sawWave(float frequency, float& phase) {
-    float value = phase / PI;
+    float value = 2.0 * (phase / twoPi) - 1.0;
     phase += twoPi * frequency / sampleRate;
     if (phase >= twoPi) {
         phase -= twoPi;
@@ -125,15 +128,6 @@ float triangleWave(float frequency, float& phase) {
     return value;
 }
 
-float phaseWave(float frequency, float& phase) {
-    float value = phase;
-    phase += twoPi * frequency / sampleRate;
-    if (phase >= twoPi) {
-        phase -= twoPi;
-    }
-    return value;
-}
-
 float noise(float frequency, float& phase) {
     float value = (float)GetRandomValue(-1, 1);
     phase += twoPi * frequency / sampleRate;
@@ -143,29 +137,41 @@ float noise(float frequency, float& phase) {
     return value;
 }
 
-void controls(float &frequency, bool &keyDown) {
+/*void resetPhasesForActiveFrequencies() {
+    for (float freq : activeFrequencies) {
+        phases[freq] = 0.0f;
+    }
+} */
+
+void controls() {
+
     if (IsKeyPressed(KEY_UP)) {     // tuning
-        tuningFactor *= 2;  
+        tuningFactor *= 2;
+        //resetPhasesForActiveFrequencies();
     }
     if (IsKeyPressed(KEY_DOWN)) {
         tuningFactor *= 0.5;
+        //resetPhasesForActiveFrequencies();
     }
     if (IsKeyDown(KEY_RIGHT)) {
         tuningFactor *= 1.01;
+        //resetPhasesForActiveFrequencies();
     }
     if (IsKeyDown(KEY_LEFT)) {
         tuningFactor *= 0.99;
+        //resetPhasesForActiveFrequencies();
     }
 
     for (const auto& pair : keyToNote) {
-        if (IsKeyDown(pair.first)) {
-            frequency = noteFrequencies[pair.second] * tuningFactor;
-            keyDown = true;
-            break;
+        float tunedFreq = noteFrequencies[pair.second];// * tuningFactor;
+        if (IsKeyDown(pair.first) && activeFrequencies.find(tunedFreq) == activeFrequencies.end()) {
+            activeFrequencies.insert(tunedFreq);
+        }
+        else if (IsKeyReleased(pair.first)) {
+            activeFrequencies.erase(tunedFreq);
         }
     }
 }
-
 
 const int oscilloscopeSize = 800;
 short circularBuffer[oscilloscopeSize];
@@ -186,7 +192,7 @@ int main() {
     std::string wave = "sine";
     bool keyDown = false;
 
-    std::vector<std::string> waveTypes = { "sine", "saw", "square", "triangle", "phase", "noise"};
+    std::vector<std::string> waveTypes = { "sine", "saw", "square", "triangle", "noise"};
     int currentWaveTypeIndex = 0;
 
     std::vector<short> buffer(defaultBufferSize);
@@ -195,27 +201,36 @@ int main() {
     while (!WindowShouldClose()) {
 
         if (IsAudioStreamProcessed(stream)) {
-            if (keyDown == true) {
+            if (activeFrequencies.size() > 0) {
                 for (int i = 0; i < defaultBufferSize; i++) {
-                    if (waveTypes[currentWaveTypeIndex] == "sine") {
-                        buffer[i] = static_cast<short>(sineWave(frequency, phase) * INT16_MAX);
+                    float sampleValue = 0.0f;
+                    for (float freq : activeFrequencies) {
+                        float tunedFreq = freq * tuningFactor;
+                        double phaseIncrement = twoPi * tunedFreq / sampleRate;
+                        if (waveTypes[currentWaveTypeIndex] == "sine") {
+                            sampleValue += sineWave(tunedFreq, phases[freq]);
+                        }
+                        else if (waveTypes[currentWaveTypeIndex] == "saw") {
+                            sampleValue += sawWave(tunedFreq, phases[freq]);
+                        }
+                        else if (waveTypes[currentWaveTypeIndex] == "square") {
+                            sampleValue += squareWave(tunedFreq, phases[freq]);
+                        }
+                        else if (waveTypes[currentWaveTypeIndex] == "triangle") {
+                            sampleValue += triangleWave(tunedFreq, phases[freq]);
+                        }
+                        else if (waveTypes[currentWaveTypeIndex] == "noise") {
+                            sampleValue += noise(tunedFreq, phases[freq]);
+                        }
+                        
+                        phases[freq] += phaseIncrement;
+                        if (phases[freq] > twoPi) {
+                            phases[freq] -= twoPi;
+                        }
                     }
-                    else if (waveTypes[currentWaveTypeIndex] == "saw") {
-                        buffer[i] = static_cast<short>(sawWave(frequency, phase) * INT16_MAX);
-                    }
-                    else if (waveTypes[currentWaveTypeIndex] == "square") {
-                        buffer[i] = static_cast<short>(squareWave(frequency, phase) * INT16_MAX);
-                    }
-                    else if (waveTypes[currentWaveTypeIndex] == "triangle") {
-                        buffer[i] = static_cast<short> (triangleWave(frequency, phase) * INT16_MAX);
-                    }
-                    else if (waveTypes[currentWaveTypeIndex] == "phase") {
-                        buffer[i] = static_cast<short> (phaseWave(frequency, phase) * INT16_MAX);
-                    }
-                    else if (waveTypes[currentWaveTypeIndex] == "noise") {
-                        buffer[i] = static_cast<short> (noise(frequency, phase) * INT16_MAX);
-                    }
+                    sampleValue /= activeFrequencies.size() > 0 ? activeFrequencies.size() : 1;
 
+                    buffer[i] = static_cast<short>(sampleValue * INT16_MAX);
 
                     circularBuffer[bufferIndex] = buffer[i];
                     bufferIndex = (bufferIndex + 1) % oscilloscopeSize;
@@ -224,7 +239,7 @@ int main() {
             }
         }
         keyDown = false;
-        controls(frequency, keyDown);
+        controls();
 
         if (IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT)) {
             currentWaveTypeIndex = (currentWaveTypeIndex + 1) % waveTypes.size();
