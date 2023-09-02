@@ -58,7 +58,7 @@ public:
     }
 
     float process(float in) {
-        float out = (b0 / a0) * in + (b1 / a0) * x1 + (b2 / a0) * x2 - (a1 / a0) * y1 - (a2 / a0) * y2;
+        float out = b0 * in + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
 
         x2 = x1;
         x1 = in;
@@ -290,6 +290,7 @@ int main() {
                     sampleValue /= activeFrequencies.size() > 0 ? activeFrequencies.size() : 1;
 
                     sampleValue = filter.process(sampleValue);
+                    
                     sampleValue *= 0.5;
                     if (sampleValue > 1.0f) sampleValue = 1.0f;
                     if (sampleValue < -1.0f) sampleValue = -1.0f;
