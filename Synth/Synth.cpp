@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <string>
 #include <set>
+#include <iostream>
 
 const int sampleRate = 44100;
 const float twoPi = 2 * PI;
@@ -15,6 +16,45 @@ const int defaultBufferSize = 1024;
 float tuningFactor = 1.0f;
 std::set<float> activeFrequencies;
 std::unordered_map<float, float> phases;
+
+// UI elements
+Rectangle cycleWaveformButton = { 10, 10, 150, 40 };
+Rectangle octaveUpButton = { 10, 60, 150, 40 };
+Rectangle octaveDownButton = { 10, 110, 150, 40 };
+Rectangle tuneKnob = { 10, 160, 40, 40 };
+
+// filter
+float cutoff = 1000.0f; 
+float resonance = 2.0f;
+
+class StateVariableFilter {
+private:
+    float fs; // sample rate
+    float f;  // frequency
+    float q;  // resonance
+
+    float low, band, high; // filter states
+
+public:
+    StateVariableFilter(float sampleRate) : fs(sampleRate), f(440.0), q(1.0), low(0), band(0), high(0) {}
+
+    void setCutoff(float cutoff) {
+        if (cutoff > 5500.0f) cutoff = 5500.0f;
+        if (cutoff < 0.0f) cutoff = 0.0f;
+        f = cutoff;
+    }
+    void setResonance(float resonance) { q = resonance; }
+
+    float process(float input) {
+        float F = 2.0 * sin((PI * f) / fs);
+        low += F * band;
+        high = input - low - q * band;
+        band += F * high;
+        return low; // returns low-pass. can be changed to band for band-pass and high for high-pass
+    }
+};
+
+
 
 std::unordered_map<std::string, float> noteFrequencies = {
     // octave 3
@@ -178,6 +218,7 @@ short circularBuffer[oscilloscopeSize];
 int bufferIndex = 0;
 
 int main() {  
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(800, 550, "synth"); 
     InitAudioDevice();
     
@@ -186,11 +227,20 @@ int main() {
     AudioStream stream = LoadAudioStream(sampleRate, 16, 1);
     PlayAudioStream(stream);
 
-    float frequency = 220.0f;
+    float frequency = 440.0f;
     float phase = 0.0f;
 
+    StateVariableFilter svf(sampleRate);
+    svf.setCutoff(1000.0);
+    svf.setResonance(2.0);
+    StateVariableFilter svf1(sampleRate);   // for 4-pole
+    svf1.setCutoff(1000.0);
+    svf1.setResonance(2.0);
+    StateVariableFilter svf2(sampleRate);   // for 6-pole
+    svf2.setCutoff(1000.0);
+    svf2.setResonance(2.0);
+
     std::string wave = "sine";
-    bool keyDown = false;
 
     std::vector<std::string> waveTypes = { "sine", "saw", "square", "triangle", "noise"};
     int currentWaveTypeIndex = 0;
@@ -230,6 +280,12 @@ int main() {
                     }
                     sampleValue /= activeFrequencies.size() > 0 ? activeFrequencies.size() : 1;
 
+                    sampleValue = svf.process(sampleValue);
+
+                     sampleValue = svf1.process(sampleValue);
+                     //sampleValue = svf2.process(sampleValue);
+
+                    sampleValue *= 0.5;
                     buffer[i] = static_cast<short>(sampleValue * INT16_MAX);
 
                     circularBuffer[bufferIndex] = buffer[i];
@@ -238,14 +294,38 @@ int main() {
                 UpdateAudioStream(stream, buffer.data(), defaultBufferSize);
             }
         }
-        keyDown = false;
         controls();
 
         if (IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT)) {
             currentWaveTypeIndex = (currentWaveTypeIndex + 1) % waveTypes.size();
         }
+        if (IsKeyDown(KEY_GRAVE)) {
+            cutoff -= 100.0;
+            svf.setCutoff(cutoff);
+            svf1.setCutoff(cutoff);
+            svf2.setCutoff(cutoff);
+            std::cout << cutoff << std::endl;
+        }
+        if (IsKeyDown(KEY_ONE)) {
+            cutoff += 100.0;
+            svf.setCutoff(cutoff);
+            svf1.setCutoff(cutoff);
+            svf2.setCutoff(cutoff);
+            std::cout << cutoff << std::endl;
+        }
 
-
+        /*if (CheckCollisionPointRec(GetMousePosition(), cycleWaveformButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            currentWaveTypeIndex = (currentWaveTypeIndex + 1) % waveTypes.size();
+        }
+        if (CheckCollisionPointRec(GetMousePosition(), octaveUpButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            tuningFactor *= 2;
+        }
+        if (CheckCollisionPointRec(GetMousePosition(), octaveDownButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            tuningFactor *= 0.5;
+        }
+        if (CheckCollisionPointRec(GetMousePosition(), tuneKnob) && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            tuningFactor += (GetMouseX() - (tuneKnob.x + tuneKnob.width / 2.0f)) * 0.01f;
+        } */
 
 
         BeginDrawing();
@@ -263,6 +343,18 @@ int main() {
 
             DrawLineEx({ float(i - 1), prevY }, { float(i), currentY }, 5.0, BLUE);
         }
+
+      /* DrawRectangleRec(cycleWaveformButton, LIGHTGRAY);
+       DrawText("Cycle Waveform", cycleWaveformButton.x + 5, cycleWaveformButton.y + 10, 20, DARKGRAY);
+
+       DrawRectangleRec(octaveUpButton, LIGHTGRAY);
+       DrawText("Octave Up", octaveUpButton.x + 5, octaveUpButton.y + 10, 20, DARKGRAY);
+
+       DrawRectangleRec(octaveDownButton, LIGHTGRAY);
+       DrawText("Octave Down", octaveDownButton.x + 5, octaveDownButton.y + 10, 20, DARKGRAY);
+
+       DrawRectangleRec(tuneKnob, LIGHTGRAY);
+       DrawText("Tune", tuneKnob.x + 5, tuneKnob.y - 20, 20, DARKGRAY); */
 
         EndDrawing();
     }
