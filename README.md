@@ -1,5 +1,5 @@
 # Raylib-Synthesizer
-A digital synthesizer application for personal use. The program features 6-voice polyphony with 5 different waveform oscillator types. The program also features low-pass and high-pass filters with cutoff and resonance controls. Other additions include tuning functionality, note-to-frequency mapping, and a build-in oscilloscope.
+A digital synthesizer application for personal use. The program features 6-voice polyphony with 5 different waveform oscillator types. The program also features low-pass and high-pass filters with cutoff and resonance controls. Other additions include tuning functionality, note-to-frequency mapping, and a built-in oscilloscope.
 
 ## Features:
 
