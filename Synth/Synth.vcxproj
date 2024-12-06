@@ -146,7 +146,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Controls.cpp" />
+    <ClCompile Include="Filter.cpp" />
+    <ClCompile Include="Globals.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Oscillator.cpp" />
     <ClCompile Include="Synth.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Controls.h" />
+    <ClInclude Include="Filter.h" />
+    <ClInclude Include="Globals.h" />
+    <ClInclude Include="Oscillator.h" />
+    <ClInclude Include="Synth.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
